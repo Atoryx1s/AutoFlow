@@ -287,10 +287,24 @@ def log_or_update_data(chat_id, question_idx, answer, photo_urls=None):
                 existing_row = i
                 break
 
+        def apply_color(row_num, col_num, answer_value):
+            cell_address = f"{chr(64 + col_num)}{row_num}"
+
+            if answer_value == "OK":
+                bg_color = {"red": 0.565, "green": 0.933, "blue": 0.565}
+            else:
+                bg_color = {"red": 1.0, "green": 0.78, "blue": 0.808}
+
+            sheet.format(cell_address, {
+                "backgroundColor": bg_color,
+                "horizontalAlignment": "CENTER"
+            })
+
         if existing_row:
             if answer is not None:
                 col_index = 2 + question_idx
                 sheet.update_cell(existing_row, col_index + 1, answer)
+                apply_color(existing_row, col_index + 1, answer)
 
             if photo_urls:
                 start_photo_col = 2 + len(QUESTIONS) + 3
@@ -301,7 +315,6 @@ def log_or_update_data(chat_id, question_idx, answer, photo_urls=None):
         else:
             base_columns = 2 + len(QUESTIONS) + 3
             extra_columns = len(photo_urls) if photo_urls else 0
-            total_columns = base_columns + extra_columns
 
             new_row = [date, weather] + [""] * len(QUESTIONS) + ["", "", ""] + [""] * extra_columns
 
@@ -313,6 +326,11 @@ def log_or_update_data(chat_id, question_idx, answer, photo_urls=None):
                     new_row[start_photo_col + i] = f"{url}"
 
             sheet.append_row(new_row)
+
+            new_row_num = len(sheet.get_all_values())
+            if answer is not None:
+                col_index = 2 + question_idx
+                apply_color(new_row_num, col_index + 1, answer)
 
         logger.info(f"Data saved to Google Sheets for question {question_idx}")
         return True
@@ -671,6 +689,40 @@ async def generate_monthly_report(update: Update, context: CallbackContext, mont
                     "fields": "pixelSize"
                 }
             })
+
+        question_columns = [q["column"] for q in QUESTIONS]
+
+        for row_idx, row in enumerate(normalized_data, start=2):
+            for col_name in question_columns:
+                if col_name in report_headers:
+                    col_idx = report_headers.index(col_name)
+                    cell_value = row[col_idx] if col_idx < len(row) else ""
+
+                    if cell_value == "OK":
+                        bg_color = {"red": 0.565, "green": 0.933, "blue": 0.565}
+                    elif cell_value == "NO":
+                        bg_color = {"red": 1.0, "green": 0.78, "blue": 0.808}
+                    else:
+                        continue
+
+                    requests_body.append({
+                        "repeatCell": {
+                            "range": {
+                                "sheetId": sheet_id,
+                                "startRowIndex": row_idx - 1,
+                                "endRowIndex": row_idx,
+                                "startColumnIndex": col_idx,
+                                "endColumnIndex": col_idx + 1
+                            },
+                            "cell": {
+                                "userEnteredFormat": {
+                                    "backgroundColor": bg_color,
+                                    "horizontalAlignment": "CENTER"
+                                }
+                            },
+                            "fields": "userEnteredFormat(backgroundColor,horizontalAlignment)"
+                        }
+                    })
 
         if requests_body:
             service.spreadsheets().batchUpdate(

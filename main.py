@@ -636,8 +636,40 @@ async def generate_monthly_report(update: Update, context: CallbackContext, mont
 
             try:
                 report_sheet = spreadsheet.worksheet(REPORT_SPREADSHEET_NAME)
-                report_sheet.clear()
-                logger.info(f"Cleared existing sheet: {REPORT_SPREADSHEET_NAME}")
+                sheet_id = report_sheet.id
+                spreadsheet_id = spreadsheet.id
+
+                creds_obj = Credentials.from_service_account_info(creds_dict, scopes=[
+                    "https://www.googleapis.com/auth/spreadsheets"
+                ])
+                service = build('sheets', 'v4', credentials=creds_obj)
+
+                service.spreadsheets().batchUpdate(
+                    spreadsheetId=spreadsheet_id,
+                    body={"requests": [
+                        {
+                            "updateCells": {
+                                "range": {"sheetId": sheet_id},
+                                "fields": "userEnteredValue,userEnteredFormat"
+                            }
+                        },
+                        {
+                            "updateDimensionProperties": {
+                                "range": {
+                                    "sheetId": sheet_id,
+                                    "dimension": "ROWS",
+                                    "startIndex": 0,
+                                    "endIndex": 1000
+                                },
+                                "properties": {"pixelSize": 21},
+                                "fields": "pixelSize"
+                            }
+                        }
+                    ]}
+                ).execute()
+
+                logger.info(f"Fully cleared sheet: {REPORT_SPREADSHEET_NAME}")
+
             except gspread.WorksheetNotFound:
                 report_sheet = spreadsheet.add_worksheet(
                     title=REPORT_SPREADSHEET_NAME,
@@ -746,8 +778,9 @@ async def generate_monthly_report(update: Update, context: CallbackContext, mont
         logger.info(f"Report {report_name} úspešne vytvorený: {report_url}")
 
     except Exception as e:
-        error_msg = f"Chyba pri generovaní reportu: {str(e)}"
-        logger.error(error_msg)
+            error_msg = f"Chyba pri generovaní reportu: {str(e)}"
+            logger.error(error_msg)
+            await context.bot.send_message(chat_id=CHAT_ID, text="❌ Chyba pri generovaní reportu")
 
 # --- Monthly auto report ---
 async def monthly_auto_report(context: CallbackContext):
@@ -786,6 +819,7 @@ async def full_report_command(update: Update, context: CallbackContext):
 
 # --- Last month report command ---
 async def last_month_report_command(update: Update, context: CallbackContext):
+    await context.bot.send_message(chat_id=CHAT_ID, text="Počkajte chvíľu, report sa pripravuje na odoslanie.")
     await generate_monthly_report(update, context, month_offset=-1)
 
 telegram_app = None

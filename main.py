@@ -196,13 +196,10 @@ async def handle_feedback_message(update: Update, context: CallbackContext):
     if not context.user_data.get('awaiting_feedback'):
         return
 
-    user = update.effective_user
     message_text = update.message.text
 
     success = await asyncio.to_thread(
         send_feedback_email,
-        user.full_name,
-        user.id,
         message_text
     )
 

@@ -35,6 +35,7 @@ import gspread
 import aiohttp
 import pickle
 import base64
+import resend
 
 # --- Configuration ---
 TOKEN = os.getenv('TOKEN')
@@ -43,7 +44,7 @@ CHAT_ID = int(os.getenv('CHAT_ID'))
 GOOGLE_CREDENTIALS_JSON = os.getenv('GOOGLE_CREDENTIALS_JSON')
 GOOGLE_SHEETS_EMAIL = os.getenv('GOOGLE_SHEETS_EMAIL')
 SPREADSHEET_NAME = "Building Checklist"
-REPORT_SPREADSHEET_NAME = "Building Checklist - Reports"
+REPORT_SPREADSHEET_NAME = "Building Reports"
 TIMEZONE = pytz.timezone("Europe/Bratislava")
 SMTP_SERVER = os.getenv('SMTP_SERVER')
 SMTP_PORT = int(os.getenv('SMTP_PORT'))
@@ -155,59 +156,39 @@ def add_signature_to_report(signature_url=None):
         return False
 
 # --- Feedback ---
-def send_feedback_email(user_name, user_id, message):
+def send_feedback_email(message):
     try:
-        if not all([EMAIL_USER, EMAIL_PASSWORD, ADMIN_EMAIL]):
-            logger.error("Email configuration not set")
+        if not all([EMAIL_USER, ADMIN_EMAIL]):
+            logger.error("ADMIN_EMAIL configuration not set")
             return False
 
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_USER
-        msg['To'] = ADMIN_EMAIL
-        msg['Subject'] = f"📝 Spätná väzba od používateľa Telegram bota"
-
-        local_tz = pytz.timezone("Europe/Bratislava")
-        local_time = datetime.datetime.now(local_tz)
-
-        body = f"""
-        📨 Nová spätná väzba od používateľa:
-
-        👤 Používateľ: {user_name}
-        📅 Čas: {local_time.strftime('%Y-%m-%d %H:%M:%S')}
-
-        💬 Správa:
-        {message}
-        
-        S pozdravom
-        
-        {user_name}
-        
-        --
-        Odeslané z Building Checklist Bot
+        local_time = datetime.datetime.now(TIMEZONE)
+        html_body = f"""
+        <h3>📨 Nová spätná väzba:</h3>
+        <p><b>📅 Čas odoslania:</b> {local_time.strftime('%Y-%m-%d %H:%M:%S')}</p>
+        <hr>
+        <p><b>💬 Správa:</b></p>
+        <p style="white-space: pre-wrap; background: #f4f4f4; padding: 10px; border-radius: 5px;">{message}</p>
+        <br>
+        <p><i>Táto správa bola odoslaná bezpečne a plne anonymne (bez ukladania metaúdajov).</i></p>
         """
-
-        msg.attach(MIMEText(body, 'plain'))
-
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(EMAIL_USER, EMAIL_PASSWORD)
-            server.send_message(msg)
-
-        logger.info(f"Feedback email sent from user {user_id}")
+        resend.Emails.send({
+            "from": "Building Bot <onboarding@resend.dev>",
+            "to": [ADMIN_EMAIL],
+            "subject": "📝 Spätná väzba od používateľa Telegram bota",
+            "html": html_body,
+        })
+        logger.info("Feedback email successfully sent via Resend API.")
         return True
-
     except Exception as e:
-        logger.error(f"Error sending feedback email: {e}")
+        logger.exception(f"Error sending feedback email via HTTP API: {e}")
         return False
 
 async def feedback_command(update: Update, context: CallbackContext):
-    user = update.effective_user
     context.user_data['awaiting_feedback'] = True
-
     await update.message.reply_text(
         "📝 Napíšte nám svoje pripomienky alebo návrhy:\n\n"
-        "Čo sa vám páči? Čo by sa dalo vylepšiť?"
-        "Máte nejaké problémy s fungovaním bota?"
+        "Čo sa vám páči? Čo by sa dalo vylepšiť? Máte nejaké problémy s fungovaním bota?"
     )
 
 # --- Feedback message handler ---
@@ -817,6 +798,11 @@ async def full_report_command(update: Update, context: CallbackContext):
 
     await generate_monthly_report(update, context, month_offset=0)
 
+async def test_check(update: Update, context: CallbackContext):
+    await update.message.reply_text("Starting test...")
+    await send_daily_check(context)
+
+
 # --- Last month report command ---
 async def last_month_report_command(update: Update, context: CallbackContext):
     await context.bot.send_message(chat_id=CHAT_ID, text="Počkajte chvíľu, report sa pripravuje na odoslanie.")
@@ -843,6 +829,7 @@ async def lifespan(app: FastAPI):
     telegram_app.add_handler(CommandHandler("report", report_command))
     telegram_app.add_handler(CommandHandler("full_report", full_report_command))
     telegram_app.add_handler(CommandHandler("last_month", last_month_report_command))
+    telegram_app.add_handler(CommandHandler("test", test_check))
 
     telegram_app.job_queue.run_daily(
         send_daily_check,

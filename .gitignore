@@ -1,1 +1,18 @@
+*.class
+target/
+build/
+out/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Operating system files
+.DS_Store
+Thumbs.db
 .env
+*.db

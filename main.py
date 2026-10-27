@@ -53,6 +53,7 @@ EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
 ADMIN_EMAIL = os.getenv('ADMIN_EMAIL')
 SIGNED_BY = os.getenv('SIGNED_BY')
 SIGNATURE_IMAGE_URL = os.getenv('SIGNATURE_IMAGE_URL')
+resend.api_key = os.getenv("RESEND_API_KEY")
 
 # --- QUESTIONS ---
 QUESTIONS = [

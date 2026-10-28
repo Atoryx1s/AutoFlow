@@ -3,8 +3,8 @@ import logging
 import datetime
 import gspread
 from google.oauth2.service_account import Credentials
-from config import GOOGLE_CREDENTIALS_JSON, SPREADSHEET_NAME, GOOGLE_SHEETS_EMAIL, QUESTIONS, SIGNATURE_IMAGE_URL, SIGNED_BY, TIMEZONE
-from services.weather import get_weather
+from src.config import GOOGLE_CREDENTIALS_JSON, SPREADSHEET_NAME, GOOGLE_SHEETS_EMAIL, QUESTIONS, SIGNATURE_IMAGE_URL, SIGNED_BY, TIMEZONE
+from src.services.weather import get_weather
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 import requests
 import logging
-from config import OWM_API_KEY
+from src.config import OWM_API_KEY
 
 logger = logging.getLogger(__name__)
 

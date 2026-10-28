@@ -4,8 +4,8 @@ import datetime
 from fastapi import APIRouter, Request, status as fastapi_status
 from fastapi.responses import JSONResponse
 from telegram import Update
-from config import TOKEN, GOOGLE_CREDENTIALS_JSON, SPREADSHEET_NAME
-from database import get_sheet
+from src.config import TOKEN, GOOGLE_CREDENTIALS_JSON, SPREADSHEET_NAME
+from src.database import get_sheet
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

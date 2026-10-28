@@ -1,7 +1,7 @@
 import datetime
 import logging
 import resend
-from config import ADMIN_EMAIL, RESEND_API_KEY, TIMEZONE
+from src.config import ADMIN_EMAIL, RESEND_API_KEY, TIMEZONE
 
 logger = logging.getLogger(__name__)
 resend.api_key = RESEND_API_KEY

@@ -5,11 +5,12 @@ import calendar
 import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackContext
-from config import QUESTIONS, TOKEN, SIGNED_BY, CHAT_ID, TIMEZONE
+from config import QUESTIONS, TOKEN, SIGNED_BY, CHAT_ID, TIMEZONE, IMGBB_API_KEY
 from database import log_or_update_data, add_signature_to_report
 from services.email_serv import send_feedback_email
 from services.weather import get_weather
 from services.reports import generate_monthly_report
+import base64
 
 logger = logging.getLogger(__name__)
 
@@ -57,36 +58,92 @@ async def photo_command(update: Update, context: CallbackContext):
     current_photos = context.user_data.get("current_photos", [])
     await update.message.reply_text(f"📷 Pošlite fotografie jednu po druhej.\nUž uložené: {len(current_photos)} foto")
 
-async def upload_to_freeimagehost(file_path: str) -> str:
+async def upload_to_freeimagehost(file_path: str, token: str, freeimage_api_key: str) -> str:
+    if not freeimage_api_key:
+        raise ValueError("Kritická chyba: Kľúč API pre hosting fotografií nie je nakonfigurovaný v súbore .env!")
+
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(f"https://telegram.org{TOKEN}/{file_path}") as resp:
-                if resp.status != 200: return f"https://telegram.org{TOKEN}/{file_path}"
-                image_data = await resp.read()
-                form_data = aiohttp.FormData()
-                form_data.add_field('source', image_data, filename='photo.jpg')
-                async with session.post('https://freeimage.host', data=form_data, params={'key': TOKEN}) as upload_resp:
-                    if upload_resp.status == 200:
-                        return (await upload_resp.json())['image']['url']
-        return f"https://telegram.org{TOKEN}/{file_path}"
-    except Exception:
-        return f"https://telegram.org{TOKEN}/{file_path}"
+            if file_path.startswith("http://") or file_path.startswith("https://"):
+                telegram_url = file_path
+            else:
+                telegram_url = f"https://api.telegram.org/file/bot{token}/{file_path}"
 
+            logger.info(f"Sťahujem súbor z Telegramu cez URL: {telegram_url}")
+            async with session.get(telegram_url) as resp:
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    raise RuntimeError(
+                        f"Nepodarilo sa načítať fotografiu z rozhrania Telegram API. Stav: {resp.status}, Podrobnosti: {error_text}")
+                image_data = await resp.read()
+
+            image_base64 = base64.b64encode(image_data).decode('utf-8')
+
+            form_data = aiohttp.FormData()
+            form_data.add_field('key', freeimage_api_key)
+            form_data.add_field('action', 'upload')
+            form_data.add_field('source', image_base64)
+            form_data.add_field('format', 'json')
+
+            async with session.post('https://freeimage.host/api/1/upload', data=form_data) as upload_resp:
+                data = await upload_resp.json()
+
+                if upload_resp.status == 200 and data.get('status_code') == 200:
+                    url = data['image']['url']
+                    logger.info(f"Photo successfully uploaded to FreeImage.Host: {url}")
+                    return url
+                else:
+                    error_msg = data.get('error', {}).get('message', 'Unknown API error')
+                    raise RuntimeError(f"FreeImage.Host zamietol žiadosť: {error_msg}")
+
+    except Exception as e:
+        logger.exception(f"Kritická chyba pri načítaní fotografie: {e}")
+        raise
+    
 async def photo(update: Update, context: CallbackContext):
     current_step = context.user_data.get("survey_step", 0)
-    question_idx = current_step - 1
-    if question_idx >= len(QUESTIONS): return
 
-    file = await update.message.photo[-1].get_file()
-    file_path = file.file_path.split(f"/bot{TOKEN}/")[-1] if f"/bot{TOKEN}/" in file.file_path else file.file_path
-    permanent_url = await upload_to_freeimagehost(file_path)
+    question_idx = current_step - 1
+    if question_idx >= len(QUESTIONS):
+        await update.message.reply_text("✅ Anketa bola ukončená!")
+        return
+
+    question = QUESTIONS[question_idx]
+    column = question["column"]
+
+    photo = update.message.photo[-1]
+    file = await photo.get_file()
+
+    full_url = file.file_path
+    if full_url and f"/bot{TOKEN}/" in full_url:
+        file_path = full_url.split(f"/bot{TOKEN}/")[-1]
+    else:
+        file_path = full_url
+
+    logger.info(f"Extracted file path: {file_path}")
+
+    permanent_url = await upload_to_freeimagehost(file_path, TOKEN, IMGBB_API_KEY)
 
     current_photos = context.user_data.get("current_photos", [])
     current_photos.append(permanent_url)
     context.user_data["current_photos"] = current_photos
 
-    success = await asyncio.to_thread(log_or_update_data, update.effective_chat.id, question_idx, None, current_photos)
-    if success: await update.message.reply_text(f"✅ Fotografia uložená! Celkom: {len(current_photos)}")
+    success = await asyncio.to_thread(
+        log_or_update_data,
+        update.effective_chat.id,
+        question_idx,
+        None,
+        current_photos
+    )
+
+    if success:
+        await update.message.reply_text(
+            f"✅ Fotografia je uložená!\n"
+            f"📸 Celkom zachované: {len(current_photos)} foto\n\n"
+            f"Môžete poslať ďalšie fotografie alebo odpovedať na otázky"
+        )
+    else:
+        await update.message.reply_text("❌ Chyba pri ukladaní fotografie.")
 
 async def feedback_command(update: Update, context: CallbackContext):
     context.user_data['awaiting_feedback'] = True

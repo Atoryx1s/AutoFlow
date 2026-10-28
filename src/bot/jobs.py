@@ -2,9 +2,9 @@ import datetime
 import calendar
 import logging
 from telegram.ext import CallbackContext
-from config import CHAT_ID, TIMEZONE
-from services.weather import get_weather
-from services.reports import generate_monthly_report
+from src.config import CHAT_ID, TIMEZONE
+from src.services.weather import get_weather
+from src.services.reports import generate_monthly_report
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,7 @@ def is_weekday():
     return datetime.datetime.now(TIMEZONE).weekday() < 5
 
 async def send_question(chat_id, context, question_idx):
-    from bot.handlers import send_question_impl
+    from src.bot.handlers import send_question_impl
     await send_question_impl(chat_id, context, question_idx)
 
 async def send_daily_check(context: CallbackContext):

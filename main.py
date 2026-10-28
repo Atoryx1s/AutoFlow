@@ -5,10 +5,10 @@ import uvicorn
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters
-from config import TOKEN, TIMEZONE
-import bot.handlers as handlers
-from bot.jobs import send_daily_check, monthly_auto_report
-from api import router as api_router, set_telegram_app
+from src.config import TOKEN, TIMEZONE
+import src.bot.handlers as handlers
+from src.bot.jobs import send_daily_check, monthly_auto_report
+from src.api import router as api_router, set_telegram_app
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)

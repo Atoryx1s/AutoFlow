@@ -9,8 +9,8 @@ from google.oauth2.service_account import Credentials
 from telegram import Update
 from telegram.ext import CallbackContext
 from googleapiclient.discovery import build
-from config import GOOGLE_CREDENTIALS_JSON, REPORT_SPREADSHEET_NAME, GOOGLE_SHEETS_EMAIL, QUESTIONS, TIMEZONE, CHAT_ID
-from database import get_sheet
+from src.config import GOOGLE_CREDENTIALS_JSON, REPORT_SPREADSHEET_NAME, GOOGLE_SHEETS_EMAIL, QUESTIONS, TIMEZONE, CHAT_ID
+from src.database import get_sheet
 
 logger = logging.getLogger(__name__)
 

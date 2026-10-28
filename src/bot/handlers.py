@@ -5,11 +5,11 @@ import calendar
 import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackContext
-from config import QUESTIONS, TOKEN, SIGNED_BY, CHAT_ID, TIMEZONE, IMGBB_API_KEY
+from src.config import QUESTIONS, TOKEN, SIGNED_BY, CHAT_ID, TIMEZONE, IMGBB_API_KEY
 from database import log_or_update_data, add_signature_to_report
-from services.email_serv import send_feedback_email
-from services.weather import get_weather
-from services.reports import generate_monthly_report
+from src.services.email_serv import send_feedback_email
+from src.services.weather import get_weather
+from src.services.reports import generate_monthly_report
 import base64
 
 logger = logging.getLogger(__name__)
@@ -177,13 +177,15 @@ async def report_command(update: Update, context: CallbackContext):
     await generate_monthly_report(update, context, month_offset=0)
 
 async def full_report_command(update: Update, context: CallbackContext):
+    await context.bot.send_message(chat_id=CHAT_ID, text="Počkajte chvíľu, report sa pripravuje...")
     today = datetime.datetime.now(TIMEZONE)
     await generate_monthly_report(update, context, month_offset=0)
 
 async def last_month_report_command(update: Update, context: CallbackContext):
+    await context.bot.send_message(chat_id=CHAT_ID, text="Počkajte chvíľu, report sa pripravuje...")
     await generate_monthly_report(update, context, month_offset=-1)
 
 async def test_check(update: Update, context: CallbackContext):
-    from bot.jobs import send_daily_check
+    from src.bot.jobs import send_daily_check
     await update.message.reply_text("Starting test...")
     await send_daily_check(context)
